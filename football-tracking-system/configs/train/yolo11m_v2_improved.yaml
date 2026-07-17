@@ -1,0 +1,42 @@
+# YOLO11m V2 Improved Training Configuration
+# Fine-tune from baseline best.pt with 1280px resolution + ball-focused loss tuning
+
+model: runs/detect/runs/detect/yolo11m_baseline-4/weights/best.pt  # warm-start from best baseline
+data: data/processed/v1/cleaned_dataset/data.yaml
+epochs: 75
+imgsz: 1280        # KEY: 4x more pixels vs 640 — ball goes from ~6x6 to ~12x12 pixels in feature space
+batch: 4           # reduced to fit 1280px in 6GB VRAM
+device: ""         # auto-detected GPU
+workers: 0         # prevent Windows CUDA pin_memory error
+
+# Optimizer
+optimizer: AdamW
+lr0: 0.005         # lower LR — fine-tuning existing weights, not training from scratch
+lrf: 0.005         # cosine decay end multiplier
+weight_decay: 0.0005
+momentum: 0.937
+seed: 42
+
+# Loss weights — tuned to penalize ball misses harder
+box: 9.0           # default: 7.5 — heavier penalty on bounding box regression errors
+cls: 0.75          # default: 0.5 — heavier classification penalty to address ball imbalance
+dfl: 1.5           # keep default
+
+# Augmentation — tuned for small object (ball) improvement
+mosaic: 1.0
+close_mosaic: 15   # default: 10 — keep mosaic 5 extra epochs to help small obj
+copy_paste: 0.3    # overlays ball crops from data/interim/ball_crops/ to boost ball instances
+hsv_h: 0.015
+hsv_s: 0.7
+hsv_v: 0.4
+fliplr: 0.5
+scale: 0.7         # more aggressive scale jitter to show ball at various relative sizes
+translate: 0.1
+
+# Output
+project: runs/detect
+name: yolo11m_v2_improved
+save: true
+val: true
+cache: false
+plots: true

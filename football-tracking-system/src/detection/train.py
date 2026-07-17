@@ -101,6 +101,21 @@ def train_model(config_path: str, epochs_override: int = None, batch_override: i
         "cache": train_config.get("cache", False),
         "plots": train_config.get("plots", True),
         "workers": train_config.get("workers", 8),
+        # Loss weights
+        "box": train_config.get("box", 7.5),
+        "cls": train_config.get("cls", 0.5),
+        "dfl": train_config.get("dfl", 1.5),
+        # Augmentation parameters
+        "mosaic": train_config.get("mosaic", 1.0),
+        "close_mosaic": train_config.get("close_mosaic", 10),
+        "copy_paste": train_config.get("copy_paste", 0.0),
+        "hsv_h": train_config.get("hsv_h", 0.015),
+        "hsv_s": train_config.get("hsv_s", 0.7),
+        "hsv_v": train_config.get("hsv_v", 0.4),
+        "fliplr": train_config.get("fliplr", 0.5),
+        "scale": train_config.get("scale", 0.5),
+        "translate": train_config.get("translate", 0.1),
+        "momentum": train_config.get("momentum", 0.937),
     }
 
     logger.info("Starting YOLO training pipeline with parameters:")
