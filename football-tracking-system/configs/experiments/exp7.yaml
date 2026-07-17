@@ -1,0 +1,9 @@
+# Experiment 7: Full Proposed Pipeline (Ablation Peak)
+detector: yolo11_p2
+tracker: botsort_players_ocsort_ball
+kalman: kalman_ball_filter
+homography: keypoint_homography
+team_classifier: clip_classifier
+possession: bayesian_possession
+trajectory: gru_predictor
+dataset: standard_soccer_dataset

@@ -1,0 +1,13 @@
+ultralytics
+mlflow
+opencv-python
+torch
+torchvision
+filterpy
+motmetrics
+git+https://github.com/JonathonLuiten/TrackEval.git
+open_clip_torch
+fiftyone
+imagehash
+onnx
+onnxruntime

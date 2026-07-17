@@ -1,0 +1,9 @@
+# Experiment 1: Baseline model setup with YOLOv8 and DeepSORT
+detector: yolov8n
+tracker: deepsort
+kalman: null
+homography: null
+team_classifier: null
+possession: null
+trajectory: null
+dataset: standard_soccer_dataset

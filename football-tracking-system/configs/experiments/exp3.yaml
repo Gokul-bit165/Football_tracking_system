@@ -1,0 +1,9 @@
+# Experiment 3: Detector upgrade to YOLO11
+detector: yolo11n
+tracker: bytetrack
+kalman: null
+homography: null
+team_classifier: null
+possession: null
+trajectory: null
+dataset: standard_soccer_dataset

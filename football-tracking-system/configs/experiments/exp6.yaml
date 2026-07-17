@@ -1,0 +1,9 @@
+# Experiment 6: Adding Team Classification and Possession tracking (Temporal Window)
+detector: yolo11n
+tracker: bytetrack
+kalman: kalman_ball_filter
+homography: keypoint_homography
+team_classifier: clip_classifier
+possession: temporal_window
+trajectory: null
+dataset: standard_soccer_dataset
