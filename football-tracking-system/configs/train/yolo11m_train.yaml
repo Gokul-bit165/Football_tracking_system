@@ -5,6 +5,7 @@ epochs: 50
 imgsz: 640
 batch: 8
 device: "" # Dynamically auto-detected (GPU if available, else CPU)
+workers: 0 # Disable multiprocessing data loader to bypass Windows CUDA resource mapping error
 optimizer: AdamW
 lr0: 0.01
 lrf: 0.01

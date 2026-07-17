@@ -100,6 +100,7 @@ def train_model(config_path: str, epochs_override: int = None, batch_override: i
         "val": train_config.get("val", True),
         "cache": train_config.get("cache", False),
         "plots": train_config.get("plots", True),
+        "workers": train_config.get("workers", 8),
     }
 
     logger.info("Starting YOLO training pipeline with parameters:")
