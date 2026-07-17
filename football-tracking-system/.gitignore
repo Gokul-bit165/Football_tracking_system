@@ -48,6 +48,8 @@ models/baseline/*
 *.pt
 *.engine
 
+runs/
+
 # MLflow
 mlruns/
 experiments/mlflow/mlflow.db
