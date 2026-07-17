@@ -94,7 +94,7 @@ def train_model(config_path: str, epochs_override: int = None, batch_override: i
         "lrf": train_config.get("lrf", 0.01),
         "weight_decay": train_config.get("weight_decay", 0.0005),
         "seed": train_config.get("seed", 42),
-        "project": train_config.get("project", "runs/detect"),
+        "project": train_config.get("project", "runs"),
         "name": train_config.get("name", "yolo11m_baseline"),
         "save": train_config.get("save", True),
         "val": train_config.get("val", True),

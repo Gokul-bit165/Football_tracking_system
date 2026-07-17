@@ -41,7 +41,7 @@ scale: 0.7         # more aggressive scale jitter to show ball at various relati
 translate: 0.1
 
 # Output
-project: runs/detect
+project: runs
 name: yolo11m_v2_improved
 save: true
 val: true

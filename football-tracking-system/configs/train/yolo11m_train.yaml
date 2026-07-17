@@ -11,7 +11,7 @@ lr0: 0.01
 lrf: 0.01
 weight_decay: 0.0005
 seed: 42
-project: runs/detect
+project: runs
 name: yolo11m_baseline
 save: true
 val: true
