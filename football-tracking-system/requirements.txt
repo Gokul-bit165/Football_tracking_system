@@ -11,3 +11,10 @@ fiftyone
 imagehash
 onnx
 onnxruntime
+loguru
+albumentations
+pandas
+matplotlib
+seaborn
+tqdm
+pyyaml

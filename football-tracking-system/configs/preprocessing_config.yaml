@@ -1,0 +1,102 @@
+# Football Detection Preprocessing Configuration
+
+# Version and Seeding
+version_tag: "v1"
+seed: 42
+
+# Dataset Sources (list of paths to folders containing train/valid/test splits)
+coco_sources:
+  - "data/raw/football-players-detection"
+
+# Output Locations
+output_dir: "data/processed"
+interim_dir: "data/interim"
+
+# Canonical Class Mapping (Roboflow class names -> Canonical YOLO IDs)
+# Pipeline will fail loudly if category in COCO doesn't match one of these keys.
+class_mapping:
+  "ball": 0
+  "goalkeeper": 1
+  "player": 2
+  "referee": 3
+
+# Cleaning Parameters
+cleaning:
+  remove_blurry: true
+  blur_threshold: 100.0         # Laplacian variance below this is blurry
+  
+  remove_duplicates: true
+  duplicate_threshold: 5        # Hamming distance on pHash/aHash (<= 5 is duplicate)
+  
+  remove_empty: true            # Remove images with no valid labels
+  
+  remove_logo_replay: true
+  logo_pixel_diff_threshold: 1.5 # Mean Absolute Error (0-255 scale) below this is static/replay frame
+
+# Class Balancing (Oversampling ball class)
+balancing:
+  oversample_ball: true
+  oversample_factor: 3          # Multiply frames with balls by this factor
+
+# Smart Augmentations (Only applied to train split)
+# Individual augmentations can be toggled on/off.
+augmentations:
+  enabled: true
+  image_size: 1280
+  
+  hsv:
+    enabled: true
+    hgain: 0.015
+    sgain: 0.7
+    vgain: 0.4
+    p: 0.5
+    
+  motion_blur:
+    enabled: true
+    blur_limit: [3, 7]
+    p: 0.5
+    
+  perspective:
+    enabled: true
+    scale: [0.05, 0.1]
+    p: 0.5
+    
+  horizontal_flip:
+    enabled: true
+    p: 0.5
+    
+  ball_copy_paste:
+    enabled: true
+    max_balls_to_paste: 3
+    p: 0.5
+    
+  # Stubs/Placeholders (disabled by default)
+  rain:
+    enabled: false
+    p: 0.2
+    
+  fog:
+    enabled: false
+    p: 0.2
+    
+  night_sim:
+    enabled: false
+    gamma_range: [0.4, 0.7]
+    p: 0.5
+    
+  camera_shake:
+    enabled: false
+    p: 0.3
+    
+  compression:
+    enabled: false
+    p: 0.3
+    
+  mixup:
+    enabled: false
+    p: 0.3
+    
+  random_crop:
+    enabled: false
+    crop_scale: [0.8, 1.0]
+    p: 0.5
