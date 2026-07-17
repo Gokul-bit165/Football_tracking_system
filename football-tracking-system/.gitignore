@@ -41,8 +41,6 @@ active_env/
 # Data and Models
 data/raw/*
 !data/raw/.gitkeep
-!data/raw/football-players-detection/
-!data/raw/football-players-detection/**
 data/interim/*
 !data/interim/.gitkeep
 models/baseline/*
