@@ -3,7 +3,7 @@ model: models/baseline/yolo11m.pt
 data: data/processed/v1/cleaned_dataset/data.yaml
 epochs: 50
 imgsz: 640
-batch: 16
+batch: 8
 device: "" # Dynamically auto-detected (GPU if available, else CPU)
 optimizer: AdamW
 lr0: 0.01
