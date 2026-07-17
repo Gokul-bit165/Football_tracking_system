@@ -1,5 +1,11 @@
 # YOLO11m V2 Improved Training Configuration
 # Fine-tune from baseline best.pt with 1280px resolution + ball-focused loss tuning
+#
+# Key facts confirmed before this run:
+#   - Source images are 1920x1080 — imgsz: 1280 recovers real detail (not upsampling noise)
+#   - Ball copy-paste already ran at DATA level during preprocessing (572 _rep images in train split)
+#     via augmentor.py. YOLO's copy_paste flag is segmentation-only and a no-op on bbox datasets.
+#     It has been intentionally excluded from this config.
 
 model: runs/detect/runs/detect/yolo11m_baseline-4/weights/best.pt  # warm-start from best baseline
 data: data/processed/v1/cleaned_dataset/data.yaml
@@ -23,9 +29,10 @@ cls: 0.75          # default: 0.5 — heavier classification penalty to address 
 dfl: 1.5           # keep default
 
 # Augmentation — tuned for small object (ball) improvement
+# NOTE: copy_paste is intentionally excluded — it is a segmentation-only augmentation.
+#       Ball augmentation was already done at data level (572 _rep images in train split).
 mosaic: 1.0
 close_mosaic: 15   # default: 10 — keep mosaic 5 extra epochs to help small obj
-copy_paste: 0.3    # overlays ball crops from data/interim/ball_crops/ to boost ball instances
 hsv_h: 0.015
 hsv_s: 0.7
 hsv_v: 0.4
