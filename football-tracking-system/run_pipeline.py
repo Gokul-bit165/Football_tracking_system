@@ -40,7 +40,7 @@ from src.viz.minimap import MinimapRenderer
 # ─────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────
-VIDEO_PATH  = "Copy of A1606b0e6_0 (14).mp4"
+VIDEO_PATH  = "Copy of A1606b0e6_0 (23).mp4"
 OUTPUT_VIDEO = "output_full_pipeline.mp4"
 OUTPUT_HM_A  = "output_heatmap_A.png"
 OUTPUT_HM_B  = "output_heatmap_B.png"
@@ -238,6 +238,7 @@ def run_full_pipeline():
     team_poss_frames = {"Team A": 0, "Team B": 0}
 
     frame_idx = 0
+    last_ball_px = None
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -317,8 +318,20 @@ def run_full_pipeline():
             # Pick highest confidence candidate
             ball_candidates.sort(reverse=True, key=lambda x: x[0])
             bx, by = ball_candidates[0][1]
-            smoothed = kf_ball.update([bx, by])
-            ball_px  = (int(smoothed[0]), int(smoothed[1]))
+            
+            # Keep Kalman filter state updated in the background
+            kf_ball.update([bx, by])
+            
+            # Use direct detected coordinates for drawing (prevents Kalman velocity lag/drift)
+            # Apply a very light EMA filter only to prevent subpixel jitter
+            if last_ball_px is not None:
+                bx_draw = int(0.85 * bx + 0.15 * last_ball_px[0])
+                by_draw = int(0.85 * by + 0.15 * last_ball_px[1])
+            else:
+                bx_draw, by_draw = int(bx), int(by)
+                
+            ball_px = (bx_draw, by_draw)
+            last_ball_px = ball_px
             ball_is_detected = True
             ball_miss_frames = 0
 
@@ -329,6 +342,7 @@ def run_full_pipeline():
             # Ball not seen — use Kalman prediction only
             predicted = kf_ball.predict()
             ball_px   = (int(predicted[0]), int(predicted[1]))
+            last_ball_px = ball_px
             ball_miss_frames += 1
 
             # Draw predicted ball: dashed ring (dimmer, to indicate estimate)
@@ -337,6 +351,7 @@ def run_full_pipeline():
             cv2.putText(frame, "?", (ball_px[0] - 4, ball_px[1] + 4),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 255), 1)
         else:
+            last_ball_px = None
             ball_miss_frames += 1
 
         # ── Pitch projection ──────────────────────────────

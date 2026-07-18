@@ -93,6 +93,7 @@ class KalmanBallFilter:
             self.initialize(measurement[0], measurement[1])
             return self.kf.x[:2]
             
+        self.kf.predict()  # KEY FIX: Predict step must run before update step to advance time and update covariance P
         self.kf.update(np.array(measurement, dtype=np.float32))
         return self.kf.x[:2]
 

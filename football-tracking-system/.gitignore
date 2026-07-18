@@ -63,3 +63,14 @@ experiments/mlflow/artifacts/*
 
 # Environment variables file
 .env
+
+# Large Video Files
+*.mp4
+
+# Debug Images
+raw_crop_*.png
+chart.min.js
+data/processed/v1/class_weights.json
+data/processed/v1/preprocessing_summary.md
+data/processed/v1/reports/
+data/processed/v1/statistics/
