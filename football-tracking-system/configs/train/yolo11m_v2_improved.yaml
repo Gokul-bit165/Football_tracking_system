@@ -9,7 +9,7 @@
 
 model: runs/detect/runs/detect/yolo11m_baseline-4/weights/best.pt  # warm-start from best baseline
 data: data/processed/v1/cleaned_dataset/data.yaml
-epochs: 75
+epochs: 35
 imgsz: 1280        # KEY: 4x more pixels vs 640 — ball goes from ~6x6 to ~12x12 pixels in feature space
 batch: 4           # reduced to fit 1280px in 6GB VRAM
 device: ""         # auto-detected GPU
@@ -45,5 +45,5 @@ project: runs
 name: yolo11m_v2_improved
 save: true
 val: true
-cache: false
+cache: true
 plots: true
