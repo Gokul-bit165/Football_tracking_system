@@ -7,8 +7,8 @@
 #     via augmentor.py. YOLO's copy_paste flag is segmentation-only and a no-op on bbox datasets.
 #     It has been intentionally excluded from this config.
 
-model: football-tracking-system/runs/detect/runs/detect/yolo11m_baseline-4/weights/best.pt  # warm-start from best baseline
-data: football-tracking-system/data/processed/v1/cleaned_dataset/data.yaml
+model: runs/detect/runs/detect/yolo11m_baseline-4/weights/best.pt  # warm-start from best baseline
+data: data/processed/v1/cleaned_dataset/data.yaml
 epochs: 35
 patience: 10        # early stopping: training stops if no validation improvement for 10 epochs
 imgsz: 1280        # KEY: 4x more pixels vs 640 — ball goes from ~6x6 to ~12x12 pixels in feature space
@@ -42,7 +42,7 @@ scale: 0.7         # more aggressive scale jitter to show ball at various relati
 translate: 0.1
 
 # Output
-project: football-tracking-system/runs
+project: runs
 name: yolo11m_v2_improved
 save: true
 val: true
