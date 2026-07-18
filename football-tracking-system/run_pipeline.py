@@ -86,19 +86,17 @@ def run_visualization_pipeline(video_path: str, output_path: str, model_path: st
                 # Crop upper 45% (jersey region)
                 crop = frame[y1:y2, x1:x2]
                 
-                # Classify team using our color classifier
-                team = color_classifier.classify(crop)
+                # Restrict classification only to Team A (White) vs Team B (Red)
+                dominant_hsv = color_classifier.get_dominant_hsv(crop)
+                dist_A = color_classifier.hsv_distance(dominant_hsv, custom_colors["Team A"])
+                dist_B = color_classifier.hsv_distance(dominant_hsv, custom_colors["Team B"])
                 
-                # Match team colors to BGR values for bounding boxes
-                if team == "Team A":  # White
-                    box_color = (255, 255, 255)
+                if dist_A < dist_B:
+                    box_color = (255, 255, 255)  # White
                     label = f"White {track_id}"
-                elif team == "Team B":  # Red
-                    box_color = (0, 0, 255)
+                else:
+                    box_color = (0, 0, 255)        # Red
                     label = f"Red {track_id}"
-                else:  # Referee/Other
-                    box_color = (0, 255, 0)
-                    label = f"Ref {track_id}"
                     
                 # Draw box and label (decreased font size)
                 cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
@@ -133,48 +131,21 @@ def run_visualization_pipeline(video_path: str, output_path: str, model_path: st
             elif cls_id == 0:  # ball
                 ball_candidates.append((conf, (x1, y1, x2, y2)))
                 
-        # 3. Kalman Filter update for ball position and trajectory tail
-        ball_pt = None
+        # 3. Kalman Filter update and draw for ball position (only draw if actively detected)
         if len(ball_candidates) > 0:
             # Select candidate with highest confidence
             ball_candidates.sort(reverse=True, key=lambda x: x[0])
             best_box = ball_candidates[0][1]
             bx = (best_box[0] + best_box[2]) / 2.0
             by = (best_box[1] + best_box[3]) / 2.0
-            ball_pt = (bx, by)
             
-            # Update Kalman filter
+            # Smooth with Kalman Filter
             smoothed_pt = kf_filter.update([bx, by])
-            ball_history.append((int(smoothed_pt[0]), int(smoothed_pt[1])))
-            consecutive_missed_ball = 0
-        else:
-            # Drop frame: estimate via Kalman predict
-            if kf_filter.initialized and consecutive_missed_ball < 20:
-                predicted_pt = kf_filter.predict()
-                kf_filter.kf.x[:2] = predicted_pt
-                ball_history.append((int(predicted_pt[0]), int(predicted_pt[1])))
-                consecutive_missed_ball += 1
-            else:
-                ball_history.append(None)
-                
-        # Maintain max tail length
-        if len(ball_history) > max_tail_len:
-            ball_history.pop(0)
+            cx, cy = int(smoothed_pt[0]), int(smoothed_pt[1])
             
-        # 4. Draw the ball tail
-        for t in range(1, len(ball_history)):
-            p1 = ball_history[t-1]
-            p2 = ball_history[t]
-            if p1 is not None and p2 is not None:
-                # Fading thickness trailing back
-                thickness = int(np.sqrt(6.0 * (t / float(len(ball_history)))))
-                # Draw line in orange (0, 140, 255)
-                cv2.line(frame, p1, p2, (0, 140, 255), max(1, thickness))
-                
-        # Draw glowing dot on the current ball position
-        if len(ball_history) > 0 and ball_history[-1] is not None:
-            cv2.circle(frame, ball_history[-1], 5, (0, 140, 255), -1)
-            cv2.circle(frame, ball_history[-1], 8, (0, 180, 255), 1)
+            # Draw glowing dot on the current ball position
+            cv2.circle(frame, (cx, cy), 5, (0, 140, 255), -1)
+            cv2.circle(frame, (cx, cy), 8, (0, 180, 255), 1)
             
         # Write output frame
         out.write(frame)
