@@ -47,6 +47,11 @@ OUTPUT_HM_B  = "output_heatmap_B.png"
 OUTPUT_STATS = "output_stats.json"
 MODEL_PATH   = "runs/detect/runs/yolo11m_v2_improved/weights/best.pt"
 
+# Ball detection settings
+# Low conf threshold recovers many missed ball detections (ball recall=52%)
+BALL_CONF        = 0.10   # separate low-conf threshold just for ball class
+BALL_MAX_PREDICT = 20     # max frames to show Kalman-predicted ball (no YOLO hit)
+
 # Pitch dimensions (standard FIFA)
 PITCH_LEN = 105.0
 PITCH_WID = 68.0
@@ -175,13 +180,16 @@ def run_full_pipeline():
 
     # ── Load model ───────────────────────────
     print(f"[1/9] Loading YOLO model: {MODEL_PATH}")
-    model = YOLO(MODEL_PATH)
+    model       = YOLO(MODEL_PATH)   # tracker: players / GK / ref
+    model_ball  = YOLO(MODEL_PATH)   # separate instance: ball only (low conf)
+    print("      Loaded 2 model instances (tracker + ball detector)")
 
     # ── Init modules ─────────────────────────
     print("[2/9] Initialising pipeline modules...")
     color_clf   = ColorTeamClassifier(team_colors=TEAM_HSV)
-    kf_ball     = KalmanBallFilter(dt=0.04, process_noise=1.5, measurement_noise=1.5)
+    kf_ball     = KalmanBallFilter(dt=0.04, process_noise=1.0, measurement_noise=2.0)
     homo_est    = HomographyEstimator(reproj_threshold=5.0, smooth_alpha=0.85)
+    ball_miss_frames = 0   # consecutive frames with no YOLO ball detection
     projector   = PitchProjector(pitch_length=PITCH_LEN, pitch_width=PITCH_WID)
     possession  = TemporalWindowPossession(proximity_threshold=60.0, window_frames=8)
     stats_trk   = PlayerStatsTracker(fps=25.0)
@@ -190,10 +198,12 @@ def run_full_pipeline():
 
     # ── Compute static homography ─────────────
     print("[3/9] Computing homography matrix...")
-    H = homo_est.estimate(SRC_KEYPOINTS, DST_KEYPOINTS)
-    H = homo_est.smooth(H)
-    if H is None:
+    H_mat = homo_est.estimate(SRC_KEYPOINTS, DST_KEYPOINTS)
+    H_mat = homo_est.smooth(H_mat)
+    if H_mat is None:
         print("  WARNING: Homography estimation failed. Pitch projection disabled.")
+    else:
+        print(f"  Homography OK. Centre check: {__import__('src.calibration.pitch_projection', fromlist=['PitchProjector']).PitchProjector(PITCH_LEN, PITCH_WID).project_point((960,490), H_mat)}")
 
     # ── Open video ───────────────────────────
     print(f"[4/9] Opening video: {VIDEO_PATH}")
@@ -233,13 +243,20 @@ def run_full_pipeline():
         if not ret:
             break
 
-        # ── YOLO tracking ────────────────────
-        results = model.track(frame, persist=True, tracker="bytetrack.yaml", verbose=False)
+        # ── YOLO tracking (players/GK/Ref at normal conf) ────
+        results = model.track(frame, persist=True, tracker="bytetrack.yaml",
+                              verbose=False, conf=0.20)
+
+        # ── Separate ball-only detect (isolated model instance) ──
+        # Uses a DIFFERENT model object so it never corrupts the ByteTrack
+        # internal state that model.track() depends on between frames.
+        ball_results = model_ball.predict(frame, verbose=False,
+                                          conf=BALL_CONF, classes=[CLS_BALL])
 
         player_positions  = {}   # pixel coords: {pid: (cx_px, cy_px)}
         player_pitch_pos  = {}   # meter coords: {pid: (x_m, y_m)}
         player_teams      = {}   # {pid: team}
-        ball_px           = None # ball pixel center
+        ball_px           = None # ball pixel center (detected)
         ball_m            = None # ball meter pos
 
         if results and results[0].boxes is not None:
@@ -249,13 +266,10 @@ def run_full_pipeline():
             confs      = boxes.conf.cpu().numpy()
             track_ids  = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else [0]*len(classes)
 
-            ball_candidates = []
-
             for i in range(len(classes)):
                 cls_id  = classes[i]
                 x1, y1, x2, y2 = map(int, xyxys[i])
                 tid     = track_ids[i]
-                conf    = confs[i]
 
                 # Foot-point (base of bounding box)
                 foot_px = ((x1 + x2) // 2, y2)
@@ -269,7 +283,6 @@ def run_full_pipeline():
                     color = (255, 255, 255) if team == "Team A" else (0, 0, 255)
                     lbl   = f"{'W' if team == 'Team A' else 'R'}{tid}"
                     draw_label(frame, x1, y1, x2, y2, lbl, color)
-
                     player_positions[tid] = (foot_px[0], foot_px[1])
                     player_teams[tid]     = team
 
@@ -283,57 +296,85 @@ def run_full_pipeline():
                     player_positions[tid] = (foot_px[0], foot_px[1])
                     player_teams[tid]     = "Referee"
 
-                elif cls_id == CLS_BALL:
-                    ball_candidates.append((conf, ((x1 + x2) / 2, (y1 + y2) / 2)))
+        # ── Ball detection: use low-conf pass ─────────────────
+        ball_candidates = []
+        if ball_results and ball_results[0].boxes is not None:
+            br_boxes = ball_results[0].boxes
+            br_xyxy  = br_boxes.xyxy.cpu().numpy()
+            br_confs = br_boxes.conf.cpu().numpy()
+            for i in range(len(br_confs)):
+                x1, y1, x2, y2 = map(int, br_xyxy[i])
+                cx = (x1 + x2) / 2.0
+                cy = (y1 + y2) / 2.0
+                # Sanity: ball box should be small (< 5% of frame width)
+                box_w = x2 - x1
+                if box_w < W * 0.05:
+                    ball_candidates.append((br_confs[i], (cx, cy)))
 
-            # ── Ball tracking ─────────────────
-            if ball_candidates:
-                ball_candidates.sort(reverse=True, key=lambda x: x[0])
-                bx, by = ball_candidates[0][1]
-                smoothed = kf_ball.update([bx, by])
-                ball_px  = (int(smoothed[0]), int(smoothed[1]))
-                cv2.circle(frame, ball_px, 5, (0, 140, 255), -1)
-                cv2.circle(frame, ball_px, 8, (0, 180, 255), 1)
+        # ── Kalman update / predict ───────────────────────────
+        ball_is_detected = False
+        if ball_candidates:
+            # Pick highest confidence candidate
+            ball_candidates.sort(reverse=True, key=lambda x: x[0])
+            bx, by = ball_candidates[0][1]
+            smoothed = kf_ball.update([bx, by])
+            ball_px  = (int(smoothed[0]), int(smoothed[1]))
+            ball_is_detected = True
+            ball_miss_frames = 0
 
-            # ── Pitch projection ──────────────
-            if H is not None:
-                for pid, pix in player_positions.items():
-                    pm = projector.project_point(pix, H)
-                    player_pitch_pos[pid] = pm
+            # Draw confirmed ball: solid glowing orange dot
+            cv2.circle(frame, ball_px, 6, (0, 140, 255), -1)
+            cv2.circle(frame, ball_px, 9, (0, 200, 255), 2)
+        elif kf_ball.initialized and ball_miss_frames < BALL_MAX_PREDICT:
+            # Ball not seen — use Kalman prediction only
+            predicted = kf_ball.predict()
+            ball_px   = (int(predicted[0]), int(predicted[1]))
+            ball_miss_frames += 1
 
-                if ball_px is not None:
-                    ball_m = projector.project_point(ball_px, H)
-
-            # ── Stats: update positions ───────
-            for pid in player_positions:
-                pm   = player_pitch_pos.get(pid)
-                team = player_teams.get(pid, "Unknown")
-                stats_trk.update_position(pid, pm, team)
-
-            # ── Possession ────────────────────
-            # Use pixel proximity if no homography, else meter proximity
-            poss_positions = player_pitch_pos if H is not None else player_positions
-            poss_ball      = ball_m if H is not None else ball_px
-            curr_poss, new_events = possession.update(poss_positions, poss_ball, player_teams)
-
-            stats_trk.update_possession(curr_poss)
-
-            if curr_poss is not None:
-                team_of_poss = player_teams.get(curr_poss, "")
-                if team_of_poss in team_poss_frames:
-                    team_poss_frames[team_of_poss] += 1
-
-            # ── Pass events ───────────────────
-            for event in new_events:
-                stats_trk.update_pass_event(event)
-
-            # ── Heatmap accumulation ──────────
-            for pid, pm in player_pitch_pos.items():
-                team = player_teams.get(pid, "Unknown")
-                heatmap_gen.add_position(pid, team, pm)
-
+            # Draw predicted ball: dashed ring (dimmer, to indicate estimate)
+            cv2.circle(frame, ball_px, 6, (0, 80, 160), -1)
+            cv2.circle(frame, ball_px, 10, (0, 120, 200), 1)
+            cv2.putText(frame, "?", (ball_px[0] - 4, ball_px[1] + 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 200, 255), 1)
         else:
-            curr_poss = None
+            ball_miss_frames += 1
+
+        # ── Pitch projection ──────────────────────────────
+        if H_mat is not None:
+            for pid, pix in player_positions.items():
+                pm = projector.project_point(pix, H_mat)
+                player_pitch_pos[pid] = pm
+
+            if ball_px is not None:
+                ball_m = projector.project_point(ball_px, H_mat)
+
+        # ── Stats: update positions ───────────────────────────
+        for pid in player_positions:
+            pm   = player_pitch_pos.get(pid)
+            team = player_teams.get(pid, "Unknown")
+            stats_trk.update_position(pid, pm, team)
+
+        # ── Possession ────────────────────────────────────
+        poss_positions = player_pitch_pos if H_mat is not None else player_positions
+        poss_ball      = ball_m if H_mat is not None else ball_px
+        curr_poss, new_events = possession.update(poss_positions, poss_ball, player_teams)
+
+        stats_trk.update_possession(curr_poss)
+
+        if curr_poss is not None:
+            team_of_poss = player_teams.get(curr_poss, "")
+            if team_of_poss in team_poss_frames:
+                team_poss_frames[team_of_poss] += 1
+
+        # ── Pass events ───────────────────────────────────────
+        for event in new_events:
+            stats_trk.update_pass_event(event)
+
+        # ── Heatmap accumulation ──────────────────────────────
+        for pid, pm in player_pitch_pos.items():
+            team = player_teams.get(pid, "Unknown")
+            heatmap_gen.add_position(pid, team, pm)
+
 
         # ── HUD overlay ───────────────────────
         poss_s_a = team_poss_frames["Team A"] / fps
