@@ -1,0 +1,9 @@
+names:
+  0: ball
+  1: goalkeeper
+  2: player
+  3: referee
+path: football-tracking-system/data/processed/v1/cleaned_dataset
+test: images/test
+train: images/train
+val: images/val
