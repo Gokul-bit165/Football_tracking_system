@@ -1,6 +1,14 @@
-# AI-Powered Football Player & Ball Tracking System
+# ScoutingFeed: AI-Powered Football Analytics & Player Tracking System
 
 > **A comprehensive computer vision pipeline that transforms raw broadcast match video into 2D top-down tactical heatmaps, player statistics, and game event logs.**
+
+---
+
+## 📺 Visual Preview
+
+| Play Phase: Midfield Transition (Frame 282) | Defensive Structure (Frame 557) |
+| :---: | :---: |
+| ![Midfield Transition](assets/demo_frame_1.png) | ![Defensive Structure](assets/demo_frame_2.png) |
 
 ---
 
