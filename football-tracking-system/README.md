@@ -1,112 +1,214 @@
-# Football Player & Ball Tracking System
+# AI-Powered Football Player & Ball Tracking System
 
-A state-of-the-art AI-powered research pipeline for tracking players and the ball in broadcast football videos. The system combines modern object detection, motion-centric multi-object tracking, camera motion compensation, keypoint-based pitch homography projection, team color classification, possession estimation, and short-horizon trajectory forecasting.
-
-For information on team roles, task splits, branching, and MLflow logging policies, see [CONTRIBUTING.md](file:///c:/Users/gokul/football_tracker/football-tracking-system/CONTRIBUTING.md).
+> **A comprehensive computer vision pipeline that transforms raw broadcast match video into 2D top-down tactical heatmaps, player statistics, and game event logs.**
 
 ---
 
-## Project Structure
+## 🚀 Key Features
+
+* **Advanced Object Detection**: Dual-pass YOLO11m architecture customized for high-speed tracking and tiny-object (ball) recovery.
+* **Stable Multi-Object Tracking**: Integration of ByteTrack to maintain persistent player track IDs during dense scrums and physical occlusions.
+* **Zero-Shot Team Classification**: Dominant-color clustering via HSV K-Means, automatically separating home and away kits under varying lighting conditions.
+* **Perspective Homography Projection**: RANSAC-estimated matrix projection mapping pixel coordinates to real-world FIFA pitch meter dimensions ($105\text{m} \times 68\text{m}$).
+* **Linear Trajectory Smoothing**: 4D Kalman filter state estimator predicting ball movement during player-ball overlaps and broadcast camera cuts.
+* **Tactical Analytics**: Real-time event log mapping ball possession, pass completion rates, and defensive interceptions.
+* **Interactive Dark-Mode Dashboard**: Self-contained analytics client showing possession split, distance covered, top speed charts, and team heatmaps.
+
+---
+
+## 📊 Model Training & Evaluation Metrics
+
+We custom-trained the detection network in two stages to address standard football broadcast challenges:
+
+1. **Baseline Run** (`yolo11m_baseline-4`): 20 epochs, 640px resolution (overall mAP50: **0.821**).
+2. **Improved Run** (`yolo11m_v2_improved`): 35 epochs, 1280px high-resolution input, AdamW optimizer, and optimized class-weighting penalizing missed ball detections.
+
+### Final Validation Performance (v2 Improved Model)
+
+| Class | Precision | Recall | mAP50 | mAP50-95 |
+| :--- | :---: | :---: | :---: | :---: |
+| **All Classes** | **0.954** | **0.800** | **0.873** | **0.629** |
+| **Player** | 0.962 | 0.982 | **0.989** | 0.805 |
+| **Referee** | 0.960 | 0.919 | 0.961 | 0.659 |
+| **Goalkeeper** | 0.982 | 0.769 | 0.954 | 0.766 |
+| **Ball** | 0.913 | 0.529 | **0.588** | 0.285 |
+
+### Metrics Visualization
+
+#### 📈 Training Progress and Loss Curves
+We tracked our bounding box, classification, and distribution focal losses over time. The box loss shows strong convergence down to `1.08`.
+
+![YOLO11m Training Results](assets/results.png)
+
+#### 🎯 F1-Confidence and Precision-Recall Curves
+At a confidence threshold of **`0.416`**, the model achieves a peak F1 score of **`0.86`** across all classes, indicating highly stable player bounding box predictions.
+
+![F1-Confidence Curve](assets/f1_curve.png)
+![Precision-Recall Curve](assets/pr_curve.png)
+
+---
+
+## 📍 Tactical Positional Heatmaps
+
+Positional coordinate arrays projected via the homography mapping are passed through a Gaussian density accumulator ($\sigma = 1.5\text{m}$) to generate tactical pitch density overlays showing player spatial distribution.
+
+| Team A (White Jerseys) Positional Density | Team B (Red Jerseys) Positional Density |
+|:---:|:---:|
+| ![Team A Heatmap](assets/output_heatmap_A.png) | ![Team B Heatmap](assets/output_heatmap_B.png) |
+
+---
+
+## 🛠️ The 9-Stage Pipeline Architecture
+
+```
+                               ┌─────────────────────────┐
+                               │     Raw Match Video     │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 1. YOLO11m Detection    │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 2. ByteTrack Tracking   │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 3. HSV K-Means Class.   │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 4. RANSAC Homography    │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 5. Kalman Ball Filter   │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 6. Possession Logic     │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 7. Pass Event Tracker   │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 8. Heatmap Generator    │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ 9. Visual HUD Overlay   │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │ Interactive Dashboard   │
+                               └─────────────────────────┘
+```
+
+### 1. Object Detection (YOLO11m)
+Detects players, referees, goalkeepers, and the ball in parallel.
+### 2. Multi-Object Tracking (ByteTrack)
+Utilizes the low-confidence association logic of ByteTrack to handle brief visual overlaps when players run behind each other.
+### 3. Team Classification
+Crops the upper 45% of the player bounding box, filters out the green grass background in HSV color space, and clusters the dominant kit colors using K-Means ($k=2$).
+### 4. Homography Projection
+Applies a smoothed perspective mapping matrix to transform frame pixel positions into real-world coordinate meters.
+### 5. Ball Smoothing (Kalman Filter)
+Maintains state estimation using a constant-velocity vector. We employ a hybrid model: we draw the raw coordinates directly during active detection, and smoothly project predictions during short occlusions.
+### 6. Temporal Window Possession
+A sliding 8-frame majority vote assigns possession only when the ball is consistently closest to a specific player ID, preventing flickering state changes.
+### 7. Pass & Interception Tracker
+Detects passing events by monitoring transition changes in possession ownership, categorizing them as successful or intercepted.
+### 8. Heatmap Accumulator
+Creates 2D Gaussian density arrays on a standard pitch canvas.
+### 9. Composition Overlay
+Renders the side-by-side video stream alongside a live bird's-eye minimap of the field.
+
+---
+
+## 📂 Project Structure
 
 ```text
 football-tracking-system/
-├── configs/
-│   ├── data/                  # Dataset yaml configs
-│   ├── models/                # Model architecture configs
-│   ├── train/                 # Training hyperparameters per experiment
-│   └── experiments/           # configs for Exp1 through Exp7
-├── data/
-│   ├── raw/                   # Original downloaded datasets (Gitignored)
-│   ├── interim/               # Master frame extractions & COCO annotations (Gitignored)
-│   └── processed/             # Cleaned YOLO splits
+├── run_pipeline.py              ← Main integrated pipeline script (Stages 1-9)
+├── generate_dashboard.py        ← Builds the self-contained dashboard client
+├── dashboard_standalone.html    ← Output: Standalone analytics dashboard UI
+│
 ├── src/
-│   ├── data/                  # Preprocessing, phash deduplication, blur filtering
-│   ├── detection/             # YOLO wrappers & custom P2 stride-4 heads
-│   ├── tracking/              # ByteTrack, BoT-SORT, OC-SORT wrappers & Kalman filters
-│   ├── team_classification/   # CLIP & CNN jersey classification
-│   ├── calibration/           # Keypoint models & RANSAC homography projection
-│   ├── possession/            # Nearest-player & Bayesian possession estimation
-│   ├── trajectory/            # GRU & Transformer predictors
-│   ├── pipeline/              # End-to-end video processing orchestration
-│   └── eval/                  # Metric computation (mAP, HOTA, IDF1, etc.)
-├── experiments/
-│   └── mlflow/                # MLflow tracking stores & local artifacts (Gitignored)
-├── deployment/
-│   ├── docker/                # Training & inference Dockerfiles
-│   ├── onnx_export.py         # Model export script
-│   └── tensorrt_build.py      # TensorRT compiler configurations
-├── dashboard/
-│   ├── backend/               # FastAPI WebSocket inference server
-│   └── frontend/              # Interactive analytics dashboard UI
-├── tests/                     # Unit & integration testing suites
-└── notebooks/                 # Exploratory Jupyter notebooks
+│   ├── calibration/
+│   │   ├── homography.py        ← RANSAC matrix calculation and smoothing
+│   │   └── pitch_projection.py  ← Pixel-to-meters projection and speed logs
+│   ├── team_classification/
+│   │   └── color_classifier.py  ← HSV jersey kit color grouping
+│   ├── tracking/
+│   │   ├── bytetrack_wrapper.py ← ByteTrack wrappers
+│   │   └── kalman_ball_filter.py← Ball Kalman state space model
+│   ├── possession/
+│   │   └── temporal_window.py   ← Possession voting and pass state machine
+│   ├── stats/
+│   │   └── player_stats.py      ← Match statistics calculator
+│   └── viz/
+│       ├── heatmap.py           ← 2D Gaussian density compiler
+│       └── minimap.py           ← Bird's-eye canvas overlay generator
+│
+├── assets/                      ← README metrics and visual assets
+├── configs/train/               ← YAML configs for YOLO11m v1/v2 models
+└── data/processed/              ← Cleaned YOLO format training datasets
 ```
 
 ---
 
-## Getting Started
+## 🛠️ Installation & Setup
 
-### 1. Repository Setup
-
-Clone the repository and navigate to the project directory:
+### 1. Environment Setup
+We recommend using **Miniconda** to manage your CUDA GPU environment:
 ```bash
-git clone <repository_url>
-cd football-tracking-system
-```
-
-### 2. Environment Setup
-
-#### Option A: Virtual Environment (Standard Python)
-Create and activate a clean virtual environment, then install dependencies:
-```bash
-# Create virtual environment
-python -m venv .venv
-
-# Activate on Windows PowerShell:
-.venv\Scripts\Activate.ps1
-# Activate on Windows CMD:
-.venv\Scripts\activate
-# Activate on Unix/Git Bash:
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-#### Option B: Conda Environment (Recommended for GPU support)
-If you have a GPU-enabled environment pre-configured (e.g. named `ai`), activate it directly:
-```bash
+# Create the environment from standard requirements
+conda create -n ai python=3.11 -y
 conda activate ai
-# Install dependencies if any are missing
+
+# Install standard dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Environment Variables Configuration
-Copy the sample environment variables and configure them:
-```bash
-cp .env.example .env
+### 2. Configure Your Video Source
+Open `run_pipeline.py` and modify the input configuration parameters:
+```python
+# run_pipeline.py
+VIDEO_PATH   = "Copy of A1606b0e6_0 (23).mp4" # Target input video
+OUTPUT_VIDEO = "output_full_pipeline.mp4"      # Combined video/minimap output
 ```
-Inside `.env`, set `MLFLOW_TRACKING_URI` to point to the shared tracking server.
 
-### 4. MLflow tracking server
+### 3. Run the Integrated Tracking Pipeline
+Execute the master pipeline to run all tracking and analytics modules:
+```bash
+python run_pipeline.py
+```
 
-To launch the MLflow tracking server locally:
-- **Unix Shell / Git Bash / WSL:**
-  ```bash
-  chmod +x start_mlflow_server.sh
-  ./start_mlflow_server.sh
-  ```
-- **Windows Command Prompt / PowerShell:**
-  ```cmd
-  start_mlflow_server.bat
-  ```
-
-Once running, the MLflow UI will be accessible at: `http://localhost:5000` (or `http://<shared-host>:5000`).
+### 4. Open the Interactive Dashboard
+Build the standalone HTML file (which embeds all stats JSON and heatmaps inline, resolving local browser CORS issues) and open it:
+```bash
+python generate_dashboard.py
+```
 
 ---
 
-## Baseline Checkpoint Handoff
-An initial baseline model directory is located under `models/baseline/`.
-- Person A will drop a YOLOv8n baseline model (`.pt` weights) here.
-- Person B will load it to run tracker evaluations.
-- This directory is gitignored to avoid pushing large binary files.
+## 🏆 Standalone Match Dashboard Overview
+The dashboard compiled in `dashboard_standalone.html` reads your local run metrics and generates:
+- **Doughnut Charts** displaying possession splits.
+- **Top Speed and Distance Covered Charts** mapping performance across all track IDs.
+- **Heatmap Tabs** showing positional distributions.
+- **Filterable Performance Tables** which can be grouped by teams.
+
+*Double-click `dashboard_standalone.html` to open it locally on any browser.*
