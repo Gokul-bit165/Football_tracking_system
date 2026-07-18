@@ -116,7 +116,11 @@ def train_model(config_path: str, epochs_override: int = None, batch_override: i
         "scale": train_config.get("scale", 0.5),
         "translate": train_config.get("translate", 0.1),
         "momentum": train_config.get("momentum", 0.937),
+        "patience": train_config.get("patience"),
     }
+    
+    # Filter out None values to let Ultralytics use its native default values
+    train_args = {k: v for k, v in train_args.items() if v is not None}
 
     logger.info("Starting YOLO training pipeline with parameters:")
     for k, v in train_args.items():
