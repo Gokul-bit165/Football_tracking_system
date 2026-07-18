@@ -6,9 +6,7 @@
 
 ## 📺 Visual Preview
 
-| Play Phase: Midfield Transition (Frame 282) | Defensive Structure (Frame 557) |
-| :---: | :---: |
-| ![Midfield Transition](assets/demo_frame_1.png) | ![Defensive Structure](assets/demo_frame_2.png) |
+![ScoutingFeed Match Analytics Pipeline](assets/demo_preview.png)
 
 ---
 
