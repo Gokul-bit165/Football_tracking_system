@@ -6,7 +6,7 @@
 
 ## 📺 Visual Preview
 
-![ScoutingFeed Match Analytics Pipeline](assets/demo_preview.png)
+![ScoutingFeed Match Analytics Pipeline](assets/demo_preview_v2.png)
 
 ---
 
@@ -44,13 +44,13 @@ We custom-trained the detection network in two stages to address standard footba
 #### 📈 Training Progress and Loss Curves
 We tracked our bounding box, classification, and distribution focal losses over time. The box loss shows strong convergence down to `1.08`.
 
-![YOLO11m Training Results](assets/results.png)
+![YOLO11m Training Results](assets/results_v2.png)
 
 #### 🎯 F1-Confidence and Precision-Recall Curves
 At a confidence threshold of **`0.416`**, the model achieves a peak F1 score of **`0.86`** across all classes, indicating highly stable player bounding box predictions.
 
-![F1-Confidence Curve](assets/f1_curve.png)
-![Precision-Recall Curve](assets/pr_curve.png)
+![F1-Confidence Curve](assets/f1_curve_v2.png)
+![Precision-Recall Curve](assets/pr_curve_v2.png)
 
 ---
 
@@ -60,7 +60,7 @@ Positional coordinate arrays projected via the homography mapping are passed thr
 
 | Team A (White Jerseys) Positional Density | Team B (Red Jerseys) Positional Density |
 |:---:|:---:|
-| ![Team A Heatmap](assets/output_heatmap_A.png) | ![Team B Heatmap](assets/output_heatmap_B.png) |
+| ![Team A Heatmap](assets/output_heatmap_A_v2.png) | ![Team B Heatmap](assets/output_heatmap_B_v2.png) |
 
 ---
 
